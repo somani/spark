@@ -347,7 +347,7 @@ object SQLConf {
         "to insert a semi join in the other side to reduce the amount of shuffle data")
       .version("3.3.0")
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val RUNTIME_FILTER_NUMBER_THRESHOLD =
     buildConf("spark.sql.optimizer.runtimeFilter.number.threshold")
