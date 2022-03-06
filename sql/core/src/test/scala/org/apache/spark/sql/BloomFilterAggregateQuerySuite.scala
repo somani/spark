@@ -52,13 +52,15 @@ class BloomFilterAggregateQuerySuite extends QueryTest with SharedSparkSession {
         BloomFilterAggregate.MAX_NUM_BITS)) {
         val sqlString = s"""
                            |SELECT every(might_contain(
-                           |            (SELECT bloom_filter_agg(col, cast($numEstimatedItems as long),
-                           |                                          cast($numBits as long))
+                           |            (SELECT bloom_filter_agg(col,
+                           |              cast($numEstimatedItems as long),
+                           |              cast($numBits as long))
                            |             FROM $table),
                            |            col)) positive_membership_test,
                            |       every(might_contain(
-                           |            (SELECT bloom_filter_agg(col, cast($numEstimatedItems as long),
-                           |                                          cast($numBits as long))
+                           |            (SELECT bloom_filter_agg(col,
+                           |              cast($numEstimatedItems as long),
+                           |              cast($numBits as long))
                            |             FROM values (-1L), (100001L), (20000L) as t(col)),
                            |            col)) negative_membership_test
                            |FROM $table

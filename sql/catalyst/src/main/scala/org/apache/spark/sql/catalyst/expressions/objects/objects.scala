@@ -25,8 +25,8 @@ import scala.reflect.ClassTag
 import scala.util.{Properties, Try}
 
 import org.apache.commons.lang3.reflect.MethodUtils
-import org.apache.spark.{SparkConf, SparkEnv}
 
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.serializer._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.{InternalRow, ScalaReflection}
