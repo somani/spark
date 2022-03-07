@@ -75,6 +75,11 @@ class BloomFilterAggregateQuerySuite extends QueryTest with SharedSparkSession {
             }
             assert(exception.getMessage.contains(
               "The estimated number of items must be a positive value"))
+          } else if (numBits <= 0) {
+            val exception = intercept[AnalysisException] {
+              spark.sql(sqlString)
+            }
+            assert(exception.getMessage.contains("The number of bits must be a positive value"))
           } else {
             checkAnswer(spark.sql(sqlString), Row(true, false))
           }
@@ -86,12 +91,46 @@ class BloomFilterAggregateQuerySuite extends QueryTest with SharedSparkSession {
   test("Test that bloom_filter_agg errors out disallowed input value types") {
     val exception1 = intercept[AnalysisException] {
       spark.sql("""
-                  |SELECT bloom_filter_agg(a)
-                  |FROM values (1.2), (2.5) as t(a)"""
+        |SELECT bloom_filter_agg(a)
+        |FROM values (1.2), (2.5) as t(a)"""
         .stripMargin)
     }
     assert(exception1.getMessage.contains(
       "Input to function bloom_filter_agg should have been a bigint value"))
+
+    val exception2 = intercept[AnalysisException] {
+      spark.sql("""
+        |SELECT bloom_filter_agg(a, 2)
+        |FROM values (cast(1 as long)), (cast(2 as long)) as t(a)"""
+        .stripMargin)
+    }
+    assert(exception2.getMessage.contains(
+      "function bloom_filter_agg should have been a bigint value followed with two bigint"))
+
+    val exception3 = intercept[AnalysisException] {
+      spark.sql("""
+        |SELECT bloom_filter_agg(a, cast(2 as long), 5)
+        |FROM values (cast(1 as long)), (cast(2 as long)) as t(a)"""
+        .stripMargin)
+    }
+    assert(exception3.getMessage.contains(
+      "function bloom_filter_agg should have been a bigint value followed with two bigint"))
+
+    val exception4 = intercept[AnalysisException] {
+      spark.sql("""
+        |SELECT bloom_filter_agg(a, null, 5)
+        |FROM values (cast(1 as long)), (cast(2 as long)) as t(a)"""
+        .stripMargin)
+    }
+    assert(exception4.getMessage.contains("Null typed values cannot be used as size arguments"))
+
+    val exception5 = intercept[AnalysisException] {
+      spark.sql("""
+        |SELECT bloom_filter_agg(a, 5, null)
+        |FROM values (cast(1 as long)), (cast(2 as long)) as t(a)"""
+        .stripMargin)
+    }
+    assert(exception5.getMessage.contains("Null typed values cannot be used as size arguments"))
   }
 
   test("Test that might_contain errors out disallowed input value types") {
@@ -133,26 +172,27 @@ class BloomFilterAggregateQuerySuite extends QueryTest with SharedSparkSession {
   }
 
   test("Test that might_contain can take a constant value input") {
-    // The number of bytes of bloom filter must be dividable by 32 because each bucket is 32 bytes.
     checkAnswer(spark.sql(
       """SELECT might_contain(
-        |X'000000000123456789ABCDEF0123456789ABCDEF0123456789ABCDEF01234567',
+        |X'00000001000000050000000343A2EC6EA8C117E2D3CDB767296B144FC5BFBCED9737F267',
         |cast(201 as long))""".stripMargin),
       Row(false))
   }
 
-  test("Test that bloom_filter_agg produces non-null filter with empty input") {
-    checkAnswer(spark.sql("""SELECT bloom_filter_agg(cast(id as long)) is null from range(1, 1)"""),
-      Row(false))
+  test("Test that bloom_filter_agg produces a NULL with empty input") {
+    checkAnswer(spark.sql("""SELECT bloom_filter_agg(cast(id as long)) from range(1, 1)"""),
+      Row(null))
   }
 
   test("Test NULL inputs for might_contain") {
     checkAnswer(spark.sql(
       s"""
-         |SELECT might_contain((SELECT bloom_filter_agg(cast(id as long)) from range(1, 10000)),
+         |SELECT might_contain(null, null) both_null,
+         |       might_contain(null, 1L) null_bf,
+         |       might_contain((SELECT bloom_filter_agg(cast(id as long)) from range(1, 10000)),
          |            null) null_value
          """.stripMargin),
-      Row(null))
+      Row(null, null, null))
   }
 
   test("Test that a query with bloom_filter_agg has partial aggregates") {
