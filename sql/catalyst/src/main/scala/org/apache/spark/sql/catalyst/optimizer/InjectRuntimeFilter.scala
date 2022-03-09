@@ -230,10 +230,14 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
   }
 
   // This checks if there is already a DPP filter, as this rule is called just after DPP.
-  def hasDynamicPruningSubquery(left: LogicalPlan, right: LogicalPlan): Boolean = {
+  def hasDynamicPruningSubquery(left: LogicalPlan, right: LogicalPlan, leftKey: Expression,
+      rightKey: Expression): Boolean = {
     (left, right) match {
-      case (Filter(DynamicPruningSubquery(_, plan, _, _, _, _), _), right) => plan.sameResult(right)
-      case (left, Filter(DynamicPruningSubquery(_, plan, _, _, _, _), _)) => plan.sameResult(left)
+      case (Filter(DynamicPruningSubquery(pruningKey, _, _, _, _, _), plan), _) =>
+        pruningKey.fastEquals(leftKey) || hasDynamicPruningSubquery(plan, right, leftKey, rightKey)
+      case (_, Filter(DynamicPruningSubquery(pruningKey, _, _, _, _, _), plan)) =>
+        pruningKey.fastEquals(rightKey) ||
+          hasDynamicPruningSubquery(left, plan, leftKey, rightKey)
       case _ => false
     }
   }
@@ -281,7 +285,7 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
           // 2. There is already a runtime filter (Bloom filter or IN subquery) on the key
           // 3. The keys are simple cheap expressions
           if (filterCounter < numFilterThreshold &&
-            !hasDynamicPruningSubquery(left, right) &&
+            !hasDynamicPruningSubquery(left, right, l, r) &&
             !hasRuntimeFilter(newLeft, newRight, l, r) &&
             isSimpleExpression(l) && isSimpleExpression(r)) {
             if (canFilterLeft(joinType) && filteringHasBenefit(left, right, l, hint)) {
